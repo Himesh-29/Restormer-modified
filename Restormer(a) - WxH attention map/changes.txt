@@ -1,0 +1,1 @@
+(a) Changed attention map from channels to H*W
