@@ -159,6 +159,11 @@ class Attention(nn.Module):
             cV_list_cuda.append(torch.from_numpy(cV_cuda).cuda())
             cD_list_cuda.append(torch.from_numpy(cD_cuda).cuda())
 
+        cA_list_cuda=torch.from_numpy(cA_list_cuda).cuda()
+        cH_list_cuda=torch.from_numpy(cH_list_cuda).cuda()
+        cV_list_cuda=torch.from_numpy(cV_list_cuda).cuda()
+        cD_list_cuda=torch.from_numpy(cD_list_cuda).cuda()
+
         # Apply quantization and activation functions to the coefficients
         # (Assuming these are PyTorch modules)
         cA_list1_cuda = self.q1X1_1_cA(cA_list_cuda)
