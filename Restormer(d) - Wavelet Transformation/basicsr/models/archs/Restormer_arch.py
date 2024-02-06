@@ -152,7 +152,7 @@ class Attention(nn.Module):
 
         # Compute wavelet transform for each channel and store the coefficients
         for channel in range(x.shape[0]):
-            coeffs_cuda = pywt.dwt2(x[channel].cpu().numpy(), 'db2')
+            coeffs_cuda = pywt.dwt2(x[channel].detach().cpu().numpy(), 'db2')
             cA_cuda, (cH_cuda, cV_cuda, cD_cuda) = coeffs_cuda
             cA_list_cuda.append(torch.from_numpy(cA_cuda).cuda())
             cH_list_cuda.append(torch.from_numpy(cH_cuda).cuda())
