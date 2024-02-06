@@ -9,7 +9,6 @@ import torch.nn.functional as F
 from pdb import set_trace as stx
 import numbers
 import pywt
-import numpy as np
 
 from einops import rearrange
 
@@ -149,36 +148,47 @@ class Attention(nn.Module):
         out = self.project_out(out)
   
         # Wavelet transform along all axes
-        coeffs = []
-        for channel in range(x.shape[2]):
-            coeffs.append(pywt.dwt2(x[:,:,channel], 'db2'))
-        cA_list = [coeff[0] for coeff in coeffs] # Here list will have number of dimension=48 channels
-        cH_list = [coeff[1][0] for coeff in coeffs]
-        cV_list = [coeff[1][1] for coeff in coeffs]
-        cD_list = [coeff[1][2] for coeff in coeffs]
+        cA_list_cuda, cH_list_cuda, cV_list_cuda, cD_list_cuda = [], [], [], []
 
-        cA_list1=self.q1X1_1_cA(cA_list)
-        cA_list2=F.gelu(cA_list1)
-        cA_list3=self.q1X1_2_cA(cA_list2)
+        # Compute wavelet transform for each channel and store the coefficients
+        for channel in range(x.shape[0]):
+            coeffs_cuda = pywt.dwt2(x[channel].cpu().numpy(), 'db2')
+            cA_cuda, (cH_cuda, cV_cuda, cD_cuda) = coeffs_cuda
+            cA_list_cuda.append(torch.from_numpy(cA_cuda).cuda())
+            cH_list_cuda.append(torch.from_numpy(cH_cuda).cuda())
+            cV_list_cuda.append(torch.from_numpy(cV_cuda).cuda())
+            cD_list_cuda.append(torch.from_numpy(cD_cuda).cuda())
 
-        cH_list1=self.q1X1_1_cH(cH_list)
-        cH_list2=F.gelu(cH_list1)
-        cH_list3=self.q1X1_2_cH(cH_list2)
+        # Apply quantization and activation functions to the coefficients
+        # (Assuming these are PyTorch modules)
+        cA_list1_cuda = self.q1X1_1_cA(cA_list_cuda)
+        cA_list2_cuda = F.gelu(cA_list1_cuda)
+        cA_list3_cuda = self.q1X1_2_cA(cA_list2_cuda)
 
-        cV_list1=self.q1X1_1_cV(cV_list)
-        cV_list2=F.gelu(cV_list1)
-        cV_list3=self.q1X1_2_cV(cV_list2)
+        cH_list1_cuda = self.q1X1_1_cH(cH_list_cuda)
+        cH_list2_cuda = F.gelu(cH_list1_cuda)
+        cH_list3_cuda = self.q1X1_2_cH(cH_list2_cuda)
 
-        cD_list1=self.q1X1_1_cD(cD_list)
-        cD_list2=F.gelu(cD_list1)
-        cD_list3=self.q1X1_2_cD(cD_list2)
+        cV_list1_cuda = self.q1X1_1_cV(cV_list_cuda)
+        cV_list2_cuda = F.gelu(cV_list1_cuda)
+        cV_list3_cuda = self.q1X1_2_cV(cV_list2_cuda)
 
-        restored_channels = []
-        for i in range(len(cA_list)):
-            restored_channel = pywt.idwt2((cA_list3[i], (cH_list3[i], cV_list3[i], cD_list3[i])), 'db2')
-            restored_channels.append(restored_channel)
+        cD_list1_cuda = self.q1X1_1_cD(cD_list_cuda)
+        cD_list2_cuda = F.gelu(cD_list1_cuda)
+        cD_list3_cuda = self.q1X1_2_cD(cD_list2_cuda)
 
-        qw = np.stack(restored_channels, axis=-1)
+        # Restore the image using inverse wavelet transform
+        restored_channels_cuda = []
+        for i in range(len(cA_list_cuda)):
+            coeffs_np = (
+                cA_list3_cuda[i].cpu().numpy(),
+                (cH_list3_cuda[i].cpu().numpy(), cV_list3_cuda[i].cpu().numpy(), cD_list3_cuda[i].cpu().numpy())
+            )
+            restored_channel_cuda = pywt.idwt2(coeffs_np, 'db2')
+            restored_channels_cuda.append(torch.from_numpy(restored_channel_cuda).cuda())
+
+        # Stack the restored channels to form the final image tensor
+        qw = torch.stack(restored_channels_cuda)
 
         kw, vw = self.kv_conv(self.kv(out)).chunk(2, dim=1)
 
