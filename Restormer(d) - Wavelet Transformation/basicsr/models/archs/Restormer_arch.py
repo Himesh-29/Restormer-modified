@@ -187,8 +187,8 @@ class Attention(nn.Module):
         restored_channels_cuda = []
         for i in range(len(cA_list_cuda)):
             coeffs_np = (
-                cA_list3_cuda[i].cpu().numpy(),
-                (cH_list3_cuda[i].cpu().numpy(), cV_list3_cuda[i].cpu().numpy(), cD_list3_cuda[i].cpu().numpy())
+                cA_list3_cuda[i].detach().cpu().numpy(),
+                (cH_list3_cuda[i].detach().cpu().numpy(), cV_list3_cuda[i].detach().cpu().numpy(), cD_list3_cuda[i].detach().cpu().numpy())
             )
             restored_channel_cuda = pywt.idwt2(coeffs_np, 'db2')
             restored_channels_cuda.append(torch.from_numpy(restored_channel_cuda).cuda())
