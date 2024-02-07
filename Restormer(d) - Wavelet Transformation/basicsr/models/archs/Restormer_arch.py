@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pdb import set_trace as stx
 import numbers
-from pytorch_wavelets import DWTForward, DWTInverse
+import pywt
 
 from einops import rearrange
 
@@ -100,17 +100,17 @@ class FeedForward(nn.Module):
 ## Multi-DConv Head Transposed Self-Attention (MDTA)
 class Attention(nn.Module):
     def __init__(self, dim, num_heads, bias):
-        
         super(Attention, self).__init__()
         self.num_heads = num_heads
         self.temperature = nn.Parameter(torch.ones(1, num_heads, 1, 1))
         self.qkv = nn.Conv2d(dim, dim * 3, kernel_size=1, bias=bias)
         self.qkv_conv = nn.Conv2d(dim * 3, dim * 3, kernel_size=3, padding=1, groups=dim * 3, bias=bias)
         self.project_out = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
-    
-        #Wavelet
-    
+        
+        # Wavelet
         self.kv = nn.Conv2d(dim, dim * 2, kernel_size=1, bias=bias)
+        self.kv_conv = nn.Conv2d(dim * 2, dim * 2, kernel_size=3, padding=1, groups=dim * 2, bias=bias)
+        self.project_outw = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
 
         self.q1X1_1_cA = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
         self.q1X1_1_cH = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
@@ -121,10 +121,6 @@ class Attention(nn.Module):
         self.q1X1_2_cH = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
         self.q1X1_2_cV = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
         self.q1X1_2_cD = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
-        
-        self.kv_conv = nn.Conv2d(dim * 2, dim * 2, kernel_size=3, padding=1, groups=dim * 2, bias=bias)
-        self.project_outw = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
-
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -135,8 +131,8 @@ class Attention(nn.Module):
         k = rearrange(k, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
         v = rearrange(v, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
 
-        q = torch.nn.functional.normalize(q, dim=-1)
-        k = torch.nn.functional.normalize(k, dim=-1)
+        q = F.normalize(q, dim=-1)
+        k = F.normalize(k, dim=-1)
 
         attn = (q @ k.transpose(-2, -1)) * self.temperature
         attn = attn.softmax(dim=-1)
@@ -146,17 +142,18 @@ class Attention(nn.Module):
         out = rearrange(out, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
 
         out = self.project_out(out)
-  
-        # Wavelet transform along all axes
-        dwt = DWTForward(J=1, wave='db2')
-        idwt = DWTInverse(wave='db2')
 
+        # Wavelet transform along all axes
         cA_list_cuda, cH_list_cuda, cV_list_cuda, cD_list_cuda = [], [], [], []
 
         # Compute wavelet transform for each channel and store the coefficients
         for channel in range(x.shape[0]):
-            # Forward wavelet transform
-            cA_cuda, (cH_cuda, cV_cuda, cD_cuda) = dwt(x[channel].unsqueeze(0).unsqueeze(0).cuda())
+            coeffs_np = pywt.dwt2(x[channel].cpu().detach().numpy(), 'db2')
+            cA_np, (cH_np, cV_np, cD_np) = coeffs_np
+            cA_cuda = torch.from_numpy(cA_np).cuda()
+            cH_cuda = torch.from_numpy(cH_np).cuda()
+            cV_cuda = torch.from_numpy(cV_np).cuda()
+            cD_cuda = torch.from_numpy(cD_np).cuda()
             cA_list_cuda.append(cA_cuda)
             cH_list_cuda.append(cH_cuda)
             cV_list_cuda.append(cV_cuda)
@@ -183,16 +180,16 @@ class Attention(nn.Module):
         # Restore the image using inverse wavelet transform
         restored_channels_cuda = []
         for i in range(len(cA_list_cuda)):
-            # Inverse wavelet transform
             coeffs_np = (
-                cA_list3_cuda[i],  # cA
-                (cH_list3_cuda[i], cV_list3_cuda[i], cD_list3_cuda[i])  # (cH, cV, cD)
+                cA_list3_cuda[i].cpu().detach().numpy(),
+                (cH_list3_cuda[i].cpu().detach().numpy(), cV_list3_cuda[i].cpu().detach().numpy(), cD_list3_cuda[i].cpu().detach().numpy())
             )
-            restored_channel_cuda = idwt(coeffs_np)
+            restored_channel_np = pywt.idwt2(coeffs_np, 'db2')
+            restored_channel_cuda = torch.from_numpy(restored_channel_np).cuda()
             restored_channels_cuda.append(restored_channel_cuda)
 
         # Stack the restored channels to form the final image tensor
-        qw = torch.stack(restored_channels_cuda).detach()
+        qw = torch.stack(restored_channels_cuda).cuda()
 
         kw, vw = self.kv_conv(self.kv(out)).chunk(2, dim=1)
 
@@ -200,8 +197,8 @@ class Attention(nn.Module):
         kw = rearrange(kw, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
         vw = rearrange(vw, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
 
-        qw = torch.nn.functional.normalize(qw, dim=-1)
-        kw = torch.nn.functional.normalize(kw, dim=-1)
+        qw = F.normalize(qw, dim=-1)
+        kw = F.normalize(kw, dim=-1)
         
         attnw = (qw @ kw.transpose(-2, -1)) * self.temperature
         attnw = attnw.softmax(dim=-1)
