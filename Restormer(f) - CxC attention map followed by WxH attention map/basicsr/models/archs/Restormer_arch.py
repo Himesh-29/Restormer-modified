@@ -107,7 +107,7 @@ class Attention(nn.Module):
         self.qkv_hw = nn.Conv2d(dim, dim * 3, kernel_size=1, bias=bias)
         self.qkv_dwconv_hw = nn.Conv2d(dim * 3, dim * 3, kernel_size=3, padding=1, groups=dim * 3, bias=bias)
         self.project_out_hw = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
-        self.norm = LayerNorm(dim, LayerNorm_type="WithBias")
+        self.norm = LayerNorm(dim, LayerNorm_type=bias)
     
         # Channel Wise Attention
         self.num_heads = num_heads
@@ -141,15 +141,11 @@ class Attention(nn.Module):
         # Spatial wise attention
         q_hw, k_hw, v_hw = self.qkv_dwconv_hw(self.qkv_hw(out_c)).chunk(3, dim=1)
         
-        q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)), fft.fftn(k_hw, dim=(-2, -1))
-
-        q_fft = torch.sqrt(q_fft.real**2+q_fft.imag**2)
-        k_fft = torch.sqrt(k_fft.real**2+k_fft.imag**2)
+        q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)).real, fft.fftn(k_hw, dim=(-2, -1)).real
 
         attn_hw = q_fft * k_fft
 
-        attn_hw = fft.ifftn(attn_hw,dim=(-2, -1))
-        attn_hw = torch.sqrt(attn_hw.real**2+attn_hw.imag**2) 
+        attn_hw = fft.ifftn(attn_hw,dim=(-2, -1)).real 
 
         attn_hw_n = self.norm(attn_hw)
 
