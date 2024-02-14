@@ -1,0 +1,1 @@
+(c) Modified the activation function to incorporate the Fourier transformation
