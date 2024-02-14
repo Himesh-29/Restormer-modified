@@ -1,0 +1,84 @@
+datasets:
+
+  train:
+    batch_size_per_gpu: 2
+    dataroot_gt: ./Datasets/test/Test1200/target
+    dataroot_lq: ./Datasets/test/Test1200/input
+    dataset_enlarge_ratio: 1
+    filename_tmpl: "{}"
+    geometric_augs: true
+    gt_size: 128
+    gt_sizes: [16, 32, 48, 64, 96, 128]
+    io_backend: { type: disk }
+    iters: [2000, 1000, 500, 250, 100, 50]
+    mini_batch_sizes: [1, 1, 1, 1, 1, 1]
+    name: TrainSet
+    num_worker_per_gpu: 2
+    prefetch_mode: null
+    type: Dataset_PairedImage
+    use_shuffle: true
+
+  val:
+    dataroot_gt: ./Datasets/test/Rain100H/target
+    dataroot_lq: ./Datasets/test/Rain100H/input
+    io_backend: { type: disk }
+    name: ValSet
+    type: Dataset_PairedImage
+
+dist_params: { backend: nccl, port: 29500 }
+
+logger:
+  print_freq: 1000
+  save_checkpoint_freq: 1000.0
+  use_tb_logger: true
+  wandb: { project: null, resume_id: null }
+
+manual_seed: 100
+model_type: ImageCleanModel
+name: Restormer
+
+network_g:
+  LayerNorm_type: WithBias
+  bias: false
+  dim: 48
+  ffn_expansion_factor: 2.66
+  heads: [1, 2, 4, 8]
+  inp_channels: 3
+  num_blocks: [4, 6, 6, 8]
+  out_channels: 3
+  type: Restormer
+
+num_gpu: 2
+path: { pretrain_network_g: null, resume_state: null, strict_load_g: true }
+scale: 1
+
+train:
+  mixing_augs: { mixup: false, mixup_beta: 1.2, use_identity: true }
+  
+  optim_g:
+    betas: [0.9, 0.999]
+    lr: 0.0003
+    type: AdamW
+    weight_decay: 0.0001
+  
+  pixel_opt: { loss_weight: 1, reduction: mean, type: L1Loss }
+  
+  scheduler:
+    eta_mins: [0.0003, 0.0001]
+    periods: [2000, 4000]
+    restart_weights: [1, 1]
+    type: CosineAnnealingRestartCyclicLR
+  
+  total_iter: 3900
+  use_grad_clip: true
+  warmup_iter: -1
+
+val:
+  max_minibatch: 8
+  metrics:
+    psnr: { crop_border: 0, test_y_channel: true, type: calculate_psnr }
+  rgb2bgr: true
+  save_img: false
+  use_image: true
+  val_freq: 1000.0
+  window_size: 8
