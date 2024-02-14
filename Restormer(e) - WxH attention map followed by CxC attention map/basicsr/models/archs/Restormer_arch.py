@@ -124,13 +124,13 @@ class Attention(nn.Module):
         
         q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)), fft.fftn(k_hw, dim=(-2, -1))
 
-        q_fft = sqrt(q_fft.real**2+q_fft.imag**2)
-        k_fft = sqrt(k_fft.real**2+k_fft.imag**2)
+        q_fft = torch.sqrt(q_fft.real**2+q_fft.imag**2)
+        k_fft = torch.sqrt(k_fft.real**2+k_fft.imag**2)
 
         attn_hw = q_fft * k_fft
 
         attn_hw = fft.ifftn(attn_hw,dim=(-2, -1))
-        attn_hw = sqrt(attn_hw.real**2+attn_hw.imag**2) 
+        attn_hw = torch.sqrt(attn_hw.real**2+attn_hw.imag**2) 
 
         attn_hw_n = self.norm(attn_hw)
 
