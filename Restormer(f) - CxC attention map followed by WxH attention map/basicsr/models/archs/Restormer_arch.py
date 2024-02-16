@@ -141,18 +141,19 @@ class Attention(nn.Module):
         # Spatial wise attention
         q_hw, k_hw, v_hw = self.qkv_dwconv_hw(self.qkv_hw(out_c)).chunk(3, dim=1)
         
-        q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)).real, fft.fftn(k_hw, dim=(-2, -1)).real
+        q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)).real, fft.fftn(k_hw, dim=(-2, -1)).real #Remove fttn and replace with rftt2
 
         attn_hw = q_fft * k_fft
+        # Convolution followed by activation
 
         attn_hw = fft.ifftn(attn_hw,dim=(-2, -1)).real 
 
-        attn_hw_n = self.norm(attn_hw)
-
+        attn_hw_n = self.norm(attn_hw) #Replace with softmax
+        
         out_hw = attn_hw_n * v_hw
 
         out_hw = self.project_out_hw(out_hw)
-        
+        #Add x here
         return out_hw
 
 
@@ -168,7 +169,7 @@ class TransformerBlock(nn.Module):
         self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
 
     def forward(self, x):
-        x = x + self.attn(self.norm1(x))
+        x = x + self.attn(self.norm1(x)) #Add skip connection from channel and then from channel to spatial
         x = x + self.ffn(self.norm2(x))
 
         return x

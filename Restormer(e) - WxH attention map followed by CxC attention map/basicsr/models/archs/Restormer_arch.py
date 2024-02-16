@@ -106,6 +106,9 @@ class Attention(nn.Module):
         # Spatial Wise Attention
         self.qkv_hw = nn.Conv2d(dim, dim * 3, kernel_size=1, bias=bias)
         self.qkv_dwconv_hw = nn.Conv2d(dim * 3, dim * 3, kernel_size=3, padding=1, groups=dim * 3, bias=bias)
+        self.conv_ft=nn.Conv2d(dim, dim, kernel_size=1,bias=bias)
+        self.attn_ft=nn.Conv2d(dim, dim, kernel_size=1,bias=bias)
+        
         self.project_out_hw = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
         self.norm = LayerNorm(dim, LayerNorm_type=bias)
     
@@ -122,17 +125,21 @@ class Attention(nn.Module):
         # Spatial wise attention
         q_hw, k_hw, v_hw = self.qkv_dwconv_hw(self.qkv_hw(x)).chunk(3, dim=1)
         
-        q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)).real, fft.fftn(k_hw, dim=(-2, -1)).real
+        q_fft, k_fft = fft.rfft2(q_hw.float()), fft.rfft2(k_hw.float())
 
         attn_hw = q_fft * k_fft
 
-        attn_hw = fft.ifftn(attn_hw,dim=(-2, -1)).real 
+        attn_hw_conv = self.conv_ft(attn_hw)
 
-        attn_hw_n = self.norm(attn_hw)
+        attn_hw_activated = F.gelu(attn_hw_conv)
+
+        attn_hw_n = attn_hw_activated.softmax(dim=(-2,-1))
+        
+        attn_hw = fft.irfft2(attn_hw)
 
         out_hw = attn_hw_n * v_hw
 
-        out_hw = self.project_out_hw(out_hw)
+        out_hw = x + self.project_out_hw(out_hw)
 
         # Channel wise attention
         q_c, k_c, v_c = self.qkv_dwconv_c(self.qkv_c(out_hw)).chunk(3, dim=1)
@@ -151,7 +158,7 @@ class Attention(nn.Module):
 
         out_c = rearrange(out_c, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
 
-        out_c = self.project_out_c(out_c)
+        out_c = out_hw + self.project_out_c(out_c)
 
         return out_c
 
@@ -168,7 +175,7 @@ class TransformerBlock(nn.Module):
         self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
 
     def forward(self, x):
-        x = x + self.attn(self.norm1(x))
+        x = self.attn(self.norm1(x))
         x = x + self.ffn(self.norm2(x))
 
         return x
