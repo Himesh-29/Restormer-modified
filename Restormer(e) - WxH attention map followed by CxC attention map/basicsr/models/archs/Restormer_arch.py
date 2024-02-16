@@ -129,15 +129,21 @@ class Attention(nn.Module):
 
         attn_hw = q_fft * k_fft
 
+        attn_hw = torch.abs(attn_hw)
+
         attn_hw_conv = self.conv_ft(attn_hw)
 
         attn_hw_activated = F.gelu(attn_hw_conv)
 
-        attn_hw_n = attn_hw_activated.softmax(dim=(-2,-1))
+        attn_hw_n = F.softmax(attn_hw_activated,dim=-2)
+        attn_hw_n = F.softmax(attn_hw_n,dim=-1)
+        # attn_hw_reshaped = attn_hw_activated.view(attn_hw_activated.size(0), attn_hw_activated.size(1), -1)
+        # attn_hw_softmax = F.softmax(attn_hw_reshaped, dim=-1)
+        # attn_hw_n = attn_hw_softmax.view(attn_hw_activated.size())
         
-        attn_hw = fft.irfft2(attn_hw)
+        attn_hw_ift = fft.irfft2(attn_hw_n)
 
-        out_hw = attn_hw_n * v_hw
+        out_hw = attn_hw_ift * v_hw
 
         out_hw = x + self.project_out_hw(out_hw)
 
@@ -175,7 +181,7 @@ class TransformerBlock(nn.Module):
         self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
 
     def forward(self, x):
-        x = self.attn(self.norm1(x))
+        x = x + self.attn(self.norm1(x))
         x = x + self.ffn(self.norm2(x))
 
         return x
