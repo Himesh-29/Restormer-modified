@@ -120,14 +120,14 @@ class Attention(nn.Module):
         # Spatial wise attention
         q_hw, k_hw, v_hw = self.qkv_dwconv_hw(self.qkv_hw(x)).chunk(3, dim=1)
 
-        q_patch = rearrange(q_hw, 'b c (h patch1) (w patch2) -> b c h w patch1 patch2',b=b,c=c,h=h,w=w, patch1=self.patch_size, patch2=self.patch_size)
-        k_patch = rearrange(k_hw, 'b c (h patch1) (w patch2) -> b c h w patch1 patch2',b=b,c=c,h=h,w=w, patch1=self.patch_size, patch2=self.patch_size)
+        q_patch = rearrange(q_hw, 'b c (h patch1) (w patch2) -> b c h w patch1 patch2', patch1=self.patch_size, patch2=self.patch_size)
+        k_patch = rearrange(k_hw, 'b c (h patch1) (w patch2) -> b c h w patch1 patch2', patch1=self.patch_size, patch2=self.patch_size)
         q_fft = torch.fft.rfft2(q_patch.float())
         k_fft = torch.fft.rfft2(k_patch.float())
 
         out = q_fft * k_fft
         out = torch.fft.irfft2(out, s=(self.patch_size, self.patch_size))
-        out = rearrange(out, 'b c h w patch1 patch2 -> b c (h patch1) (w patch2)',b=b,c=c,h=h,w=w, patch1=self.patch_size, patch2=self.patch_size)
+        out = rearrange(out, 'b c h w patch1 patch2 -> b c (h patch1) (w patch2)', patch1=self.patch_size, patch2=self.patch_size)
 
         out = torch.sigmoid(out)
 
