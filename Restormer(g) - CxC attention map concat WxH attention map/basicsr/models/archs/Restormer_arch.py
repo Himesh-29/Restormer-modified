@@ -158,7 +158,7 @@ class Attention(nn.Module):
         out = torch.sigmoid(out)
 
         output = v_hw * out
-        output = out_c + self.project_out_hw(output)
+        output = self.project_out_hw(output)
 
         # Concatenating both the outputs
         out_comb = torch.cat([out_c, output], 1)
