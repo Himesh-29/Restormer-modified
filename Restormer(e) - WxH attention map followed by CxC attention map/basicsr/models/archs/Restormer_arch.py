@@ -107,8 +107,6 @@ class Attention(nn.Module):
         self.qkv_hw = nn.Conv2d(dim, dim * 3, kernel_size=1, bias=bias)
         self.qkv_dwconv_hw = nn.Conv2d(dim * 3, dim * 3, kernel_size=3, padding=1, groups=dim * 3, bias=bias)
         self.conv_ft=nn.Conv2d(dim, dim, kernel_size=1,bias=bias)
-        self.attn_ft=nn.Conv2d(dim, dim, kernel_size=1,bias=bias)
-        
         self.project_out_hw = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
         self.norm = LayerNorm(dim, LayerNorm_type=bias)
     
@@ -124,31 +122,24 @@ class Attention(nn.Module):
         
         # Spatial wise attention
         q_hw, k_hw, v_hw = self.qkv_dwconv_hw(self.qkv_hw(x)).chunk(3, dim=1)
+
+        q_patch = q_hw
+        k_patch = k_hw
+        q_fft = torch.fft.rfft2(q_patch.float())
+        k_fft = torch.fft.rfft2(k_patch.float())
+
+        out = q_fft * k_fft
+        out = torch.fft.irfft2(out).real
         
-        q_fft, k_fft = fft.rfft2(q_hw.float()), fft.rfft2(k_hw.float())
+        out = self.norm(out)
+        out = self.conv_ft(out)
+        out = torch.sigmoid(out)
 
-        attn_hw = q_fft * k_fft
-
-        attn_hw = torch.abs(attn_hw)
-
-        attn_hw_conv = self.conv_ft(attn_hw)
-
-        attn_hw_activated = F.gelu(attn_hw_conv)
-
-        attn_hw_n = F.softmax(attn_hw_activated,dim=-2)
-        attn_hw_n = F.softmax(attn_hw_n,dim=-1)
-        # attn_hw_reshaped = attn_hw_activated.view(attn_hw_activated.size(0), attn_hw_activated.size(1), -1)
-        # attn_hw_softmax = F.softmax(attn_hw_reshaped, dim=-1)
-        # attn_hw_n = attn_hw_softmax.view(attn_hw_activated.size())
-        
-        attn_hw_ift = fft.irfft2(attn_hw_n)
-
-        out_hw = attn_hw_ift * v_hw
-
-        out_hw = x + self.project_out_hw(out_hw)
+        output = v_hw * out
+        output = x + self.project_out_hw(output)
 
         # Channel wise attention
-        q_c, k_c, v_c = self.qkv_dwconv_c(self.qkv_c(out_hw)).chunk(3, dim=1)
+        q_c, k_c, v_c = self.qkv_dwconv_c(self.qkv_c(output)).chunk(3, dim=1)
         
         q_c = rearrange(q_c, 'b (head c) h w -> b head c (h w)', head=self.num_heads) 
         k_c = rearrange(k_c, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
@@ -164,7 +155,7 @@ class Attention(nn.Module):
 
         out_c = rearrange(out_c, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
 
-        out_c = out_hw + self.project_out_c(out_c)
+        out_c = output + self.project_out_c(out_c)
 
         return out_c
 

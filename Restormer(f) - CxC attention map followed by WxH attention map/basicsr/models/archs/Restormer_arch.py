@@ -107,6 +107,7 @@ class Attention(nn.Module):
         self.qkv_hw = nn.Conv2d(dim, dim * 3, kernel_size=1, bias=bias)
         self.qkv_dwconv_hw = nn.Conv2d(dim * 3, dim * 3, kernel_size=3, padding=1, groups=dim * 3, bias=bias)
         self.project_out_hw = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
+        self.conv_ft=nn.Conv2d(dim, dim, kernel_size=1,bias=bias)
         self.norm = LayerNorm(dim, LayerNorm_type=bias)
     
         # Channel Wise Attention
@@ -136,25 +137,27 @@ class Attention(nn.Module):
 
         out_c = rearrange(out_c, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
 
-        out_c = self.project_out_c(out_c)
+        out_c = x+self.project_out_c(out_c)
 
         # Spatial wise attention
         q_hw, k_hw, v_hw = self.qkv_dwconv_hw(self.qkv_hw(out_c)).chunk(3, dim=1)
+
+        q_patch = q_hw
+        k_patch = k_hw
+        q_fft = torch.fft.rfft2(q_patch.float())
+        k_fft = torch.fft.rfft2(k_patch.float())
+
+        out = q_fft * k_fft
+        out = torch.fft.irfft2(out).real
         
-        q_fft, k_fft = fft.fftn(q_hw, dim=(-2, -1)).real, fft.fftn(k_hw, dim=(-2, -1)).real #Remove fttn and replace with rftt2
+        out = self.norm(out)
+        out = self.conv_ft(out)
+        out = torch.sigmoid(out)
 
-        attn_hw = q_fft * k_fft
-        # Convolution followed by activation
+        output = v_hw * out
+        output = out_c + self.project_out_hw(output)
 
-        attn_hw = fft.ifftn(attn_hw,dim=(-2, -1)).real 
-
-        attn_hw_n = self.norm(attn_hw) #Replace with softmax
-        
-        out_hw = attn_hw_n * v_hw
-
-        out_hw = self.project_out_hw(out_hw)
-        #Add x here
-        return out_hw
+        return output
 
 
 
