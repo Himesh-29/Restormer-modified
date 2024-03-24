@@ -82,7 +82,10 @@ def create_dataloader(dataset,
             num_workers = dataset_opt['num_worker_per_gpu']
         else:  # non-distributed training
             multiplier = 1 if num_gpu == 0 else num_gpu
-            batch_size = dataset_opt['batch_size_per_gpu'] * multiplier
+            if num_gpu > 1:
+                batch_size = 1  # enforce batch size of 1 when using multiple GPUs
+            else:
+                batch_size = dataset_opt['batch_size_per_gpu'] * multiplier
             num_workers = dataset_opt['num_worker_per_gpu'] * multiplier
         dataloader_args = dict(
             dataset=dataset,

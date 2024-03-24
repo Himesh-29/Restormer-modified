@@ -80,10 +80,6 @@ def init_loggers(opt):
 
 def create_train_val_dataloader(opt, logger):
     # create train and val dataloaders
-    effective_batch_size = opt['datasets']['train']['batch_size_per_gpu']
-    num_gpus = opt['num_gpu']
-    effective_batch_size //= num_gpus
-    
     train_loader, val_loader = None, None
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
