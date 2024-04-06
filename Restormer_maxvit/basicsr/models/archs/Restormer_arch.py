@@ -11,7 +11,7 @@ import numbers
 
 from einops import rearrange
 
-from merit_lib.networks import MaxViT4Out_Small
+from networks.merit_lib.networks import MaxViT4Out_Small
 
 
 

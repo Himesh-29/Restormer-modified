@@ -17,11 +17,6 @@ from networks.merit_lib.maxxvit_4out import maxvit_tiny_rw_224 as maxvit_tiny_rw
 from networks.merit_lib.maxxvit_4out import maxvit_rmlp_tiny_rw_256 as maxvit_rmlp_tiny_rw_256_4out
 from networks.merit_lib.maxxvit_4out import maxxvit_rmlp_small_rw_256 as maxxvit_rmlp_small_rw_256_4out
 from networks.merit_lib.maxxvit_4out import maxvit_rmlp_small_rw_224 as maxvit_rmlp_small_rw_224_4out
-#from merit_lib.maxxvit_4out import maxvit_tiny_rw_224 as maxvit_tiny_rw_224_4out
-#from merit_lib.maxxvit_4out import maxvit_rmlp_tiny_rw_256 as maxvit_rmlp_tiny_rw_256_4out
-#from merit_lib.maxxvit_4out import maxxvit_rmlp_small_rw_256 as maxxvit_rmlp_small_rw_256_4out
-#from merit_lib.maxxvit_4out import maxvit_rmlp_small_rw_224 as maxvit_rmlp_small_rw_224_4out
-
 
 logger = logging.getLogger(__name__)
 
