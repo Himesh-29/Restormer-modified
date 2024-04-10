@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from pdb import set_trace as stx
 import numbers
 import timm
+from PIL import Image
+import numpy as np
 
 from einops import rearrange
 
@@ -234,9 +236,11 @@ class Restormer(nn.Module):
 
 
     def forward(self, inp_img):
+        transformed_img = inp_img.cpu().detach().numpy()
+        # Convert transformed_img to a NumPy array
         
-        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = self.encoder_model(self.encoder_transforms(inp_img))
-
+        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = self.encoder_model(self.encoder_transforms(transformed_img))
+        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = torch.from_numpy(output_enc_0), torch.from_numpy(output_enc_1), torch.from_numpy(output_enc_2), torch.from_numpy(output_enc_3), torch.from_numpy(output_enc_4)
         '''
         inp_img = [1, 3, 224, 224]
         output_enc_0 = [1, 64, 112, 112]
