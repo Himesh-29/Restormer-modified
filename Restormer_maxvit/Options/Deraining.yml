@@ -10,7 +10,7 @@ datasets:
     gt_sizes: [224]
     io_backend: { type: disk }
     iters: [4000]
-    mini_batch_sizes: [1, 1, 1, 1, 1, 1]
+    mini_batch_sizes: [1]
     name: TrainSet
     num_worker_per_gpu: 2
     prefetch_mode: null
