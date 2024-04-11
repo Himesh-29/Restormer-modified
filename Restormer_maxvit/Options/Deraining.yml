@@ -39,7 +39,7 @@ name: Restormer
 network_g:
   LayerNorm_type: WithBias
   bias: false
-  dim: 96
+  dim: 32
   ffn_expansion_factor: 2.66
   heads: [1, 2, 4, 8]
   inp_channels: 3

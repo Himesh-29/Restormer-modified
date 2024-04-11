@@ -11,6 +11,8 @@ import numbers
 import timm
 from PIL import Image
 import numpy as np
+import torchvision.transforms as T
+import torchvision.transforms.functional as TF
 
 from einops import rearrange
 
@@ -206,7 +208,7 @@ class Restormer(nn.Module):
 
         super(Restormer, self).__init__()
 
-        self.encoder_model = timm.create_model('maxvit_tiny_tf_224.in1k',pretrained=True,features_only=True)
+        self.encoder_model = timm.create_model('maxvit_tiny_tf_224.in1k',pretrained=True,features_only=True).cuda()
         self.encoder_model = self.encoder_model.eval()
 
         data_config = timm.data.resolve_model_data_config(self.encoder_model)
@@ -221,13 +223,13 @@ class Restormer(nn.Module):
         self.decoder_level2 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**2), num_heads=heads[2], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[2])])
         
         self.up2_1 = Upsample(int(dim*2**2))
-        self.reduce_chan_level2 = nn.Conv2d(int(dim*2**2), int(dim*2**1), kernel_size=1, bias=bias)
-        self.decoder_level2 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
+        self.reduce_chan_level1 = nn.Conv2d(int(dim*2**2), int(dim*2**1), kernel_size=1, bias=bias)
+        self.decoder_level1 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
 
         self.up1_0 = Upsample(int(dim*2**1))
         self.increase_channels = nn.Conv2d(int(dim),int(dim*2),kernel_size=1,bias=bias)
-        self.reduce_chan_level2 = nn.Conv2d(int(dim*4), int(dim*2), kernel_size=1, bias=bias)
-        self.decoder_level2 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
+        self.reduce_chan_level0 = nn.Conv2d(int(dim*4), int(dim*2), kernel_size=1, bias=bias)
+        self.decoder_level0 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
         
         self.up0_0 = Upsample(int(dim*2**1))
         self.refinement = nn.Sequential(*[TransformerBlock(dim=int(dim), num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_refinement_blocks)])
@@ -236,11 +238,10 @@ class Restormer(nn.Module):
 
 
     def forward(self, inp_img):
-        transformed_img = inp_img.cpu().detach().numpy()
-        # Convert transformed_img to a NumPy array
+        pil_img = TF.to_pil_image(inp_img[0])
         
-        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = self.encoder_model(self.encoder_transforms(transformed_img))
-        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = torch.from_numpy(output_enc_0), torch.from_numpy(output_enc_1), torch.from_numpy(output_enc_2), torch.from_numpy(output_enc_3), torch.from_numpy(output_enc_4)
+        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = self.encoder_model(self.encoder_transforms(pil_img).unsqueeze(0).cuda())
+
         '''
         inp_img = [1, 3, 224, 224]
         output_enc_0 = [1, 64, 112, 112]
