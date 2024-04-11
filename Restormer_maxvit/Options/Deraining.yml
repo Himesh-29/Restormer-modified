@@ -1,6 +1,6 @@
 datasets:
   train:
-    batch_size_per_gpu: 2
+    batch_size_per_gpu: 1
     dataroot_gt: ./Datasets/test/Test1200/target
     dataroot_lq: ./Datasets/test/Test1200/input
     dataset_enlarge_ratio: 1
@@ -12,7 +12,7 @@ datasets:
     iters: [4000]
     mini_batch_sizes: [1]
     name: TrainSet
-    num_worker_per_gpu: 2
+    num_worker_per_gpu: 1
     prefetch_mode: null
     type: Dataset_PairedImage
     use_shuffle: true
