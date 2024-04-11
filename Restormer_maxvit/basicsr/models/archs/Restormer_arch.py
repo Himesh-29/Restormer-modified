@@ -240,7 +240,7 @@ class Restormer(nn.Module):
     def forward(self, inp_img):
         pil_img = TF.to_pil_image(inp_img[0])
         
-        output_enc_0, output_enc_1, output_enc_2, output_enc_3, output_enc_4 = self.encoder_model(self.encoder_transforms(pil_img).unsqueeze(0).cuda())
+        output_enc_0, output_enc_1, output_enc_2, output_enc_3, _ = self.encoder_model(self.encoder_transforms(pil_img).unsqueeze(0).cuda())
 
         '''
         inp_img = [1, 3, 224, 224]
@@ -251,12 +251,7 @@ class Restormer(nn.Module):
         output_enc_4 = [1, 512, 7, 7]
         '''
 
-        inp_dec_level3 = self.up4_3(output_enc_4) # (1,254,14,14)
-        inp_dec_level3 = torch.cat([inp_dec_level3, output_enc_3], 1) # (1,512,14,14)
-        inp_dec_level3 = self.reduce_chan_level3(inp_dec_level3) # (1,254,14,14)
-        out_dec_level3 = self.decoder_level3(inp_dec_level3) # (1,254,14,14)
-
-        inp_dec_level2 = self.up3_2(out_dec_level3) # [1, 128, 28, 28]
+        inp_dec_level2 = self.up3_2(output_enc_3) # [1, 128, 28, 28]
         inp_dec_level2 = torch.cat([inp_dec_level2, output_enc_2], 1) # [1, 256, 28, 28]
         inp_dec_level2 = self.reduce_chan_level2(inp_dec_level2) # [1, 128, 28, 28]
         out_dec_level2 = self.decoder_level2(inp_dec_level2) # [1, 128, 28, 28]
